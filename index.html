@@ -3,51 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>주누디자인 통합 고객 검색 프로그램</title>
+    <title>주누디자인 고객 검색 프로그램</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
             background-color: #f8f9fa;
             font-family: 'Malgun Gothic', sans-serif;
-            padding: 20px;
+            padding: 15px;
+            font-size: 13px;
         }
         .header {
             background-color: #343a40;
             color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
             text-align: center;
         }
+        .header h1 { font-size: 1.5rem; margin-bottom: 5px; }
+        .header p { font-size: 0.85rem; margin-bottom: 0; opacity: 0.8; }
+        
         .search-container {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            margin-bottom: 15px;
         }
         .table-container {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
             overflow-x: auto;
-            max-height: 70vh;
+            max-height: 75vh;
+            /* 엑셀처럼 텍스트를 마우스 드래그로 편하게 선택할 수 있도록 설정 */
+            user-select: text;
+            -webkit-user-select: text;
+        }
+        table.table {
+            margin-bottom: 0;
+            table-layout: auto;
+            width: 100%;
         }
         table th {
             background-color: #e9ecef !important;
+            color: #333;
+            font-weight: 600;
             white-space: nowrap;
             position: sticky;
             top: 0;
-            z-index: 1;
+            z-index: 2;
+            padding: 8px 6px !important;
+            border-bottom: 2px solid #a8a8a8 !important;
+            text-align: center;
         }
         table td {
             vertical-align: middle;
-            white-space: nowrap;
+            padding: 6px 8px !important;
+            border-color: #e0e0e0;
+            word-break: break-word;
+            max-width: 200px;
         }
         .badge-year {
-            background-color: #6c757d;
-            font-size: 0.85rem;
+            background-color: #495057;
+            font-size: 0.75rem;
+        }
+        .checkbox-col {
+            width: 40px;
+            text-align: center;
+        }
+        /* 마우스 드래그 선택 시 형광펜처럼 선명하게 하이라이트 */
+        ::selection {
+            background-color: #b3d4fc;
+            color: #000;
         }
     </style>
 </head>
@@ -56,23 +85,24 @@
 <div class="container-fluid">
     <div class="header">
         <h1>📊 주누디자인 고객 검색 프로그램</h1>
-        <p>전체 연도 실시간 연동 · 향후 추가되는 새 시트(탭) 자동 통합 검색</p>
+        <p>선택 행 복사 · 엑셀 형식 마우스 드래그 복사 지원 · 초고속 보기</p>
     </div>
 
     <div class="search-container">
         <div class="row align-items-center">
-            <div class="col-md-8">
-                <input type="text" id="searchInput" class="form-control form-control-lg" placeholder="🔍 검색어를 입력하세요 (예: 홍길동, 010-1234-5678, 디엠텍스)..." disabled>
+            <div class="col-md-7 mb-2 mb-md-0">
+                <input type="text" id="searchInput" class="form-control" placeholder="🔍 검색어 입력 (고객명, 연락처, 상호 등 전체 즉시 필터링)..." disabled>
             </div>
-            <div class="col-md-4 text-end mt-3 mt-md-0">
-                <span id="statusBadge" class="badge bg-warning text-dark p-2">전체 연도 데이터 불러오는 중...</span>
-                <button id="refreshBtn" class="btn btn-outline-secondary btn-sm ms-2" onclick="loadData()">🔄 새로고침</button>
+            <div class="col-md-5 text-end">
+                <span id="statusBadge" class="badge bg-secondary p-2 me-2">대기 중...</span>
+                <button class="btn btn-success btn-sm me-1" onclick="copySelectedRowsToExcel()">📋 선택 행 복사</button>
+                <button id="refreshBtn" class="btn btn-outline-secondary btn-sm" onclick="loadData(true)">🔄 시트 최신화</button>
             </div>
         </div>
     </div>
 
     <div class="table-container">
-        <table class="table table-hover table-bordered" id="customerTable">
+        <table class="table table-hover table-bordered table-sm" id="customerTable">
             <thead>
                 <tr id="tableHeader">
                     <!-- 헤더 자동 생성 -->
@@ -87,96 +117,176 @@
 
 <script>
     // =========================================================================
-    // [중요] 1단계에서 새 버전으로 배포하고 복사한 '웹 앱 URL'을 넣어주세요!
+    // [중요] 사용 중이신 '웹 앱 URL'을 아래에 붙여넣으세요!
     // =========================================================================
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzOVRkVvJH0c5sv7zQcH9fX1qh1-JRQHMUpf-k90cIt_h-qu3ln2HPpSNrUVlO5swVG/exec';
 
     let customers = [];
     let headers = [];
+    let currentFilteredData = [];
 
+    // 헤더 렌더링 (맨 앞에 체크박스 + 연도 탭 열 추가)
+    function renderHeaders() {
+        const thead = document.getElementById('tableHeader');
+        thead.innerHTML = '';
+        
+        // 전체 선택 체크박스 열
+        const checkTh = document.createElement('th');
+        checkTh.className = "checkbox-col";
+        checkTh.innerHTML = `<input class="form-check-input" type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)" title="전체 선택/해제">`;
+        thead.appendChild(checkTh);
+
+        // 연도 열
+        const yearTh = document.createElement('th');
+        yearTh.textContent = "연도(시트)";
+        thead.appendChild(yearTh);
+
+        headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header;
+            thead.appendChild(th);
+        });
+    }
+
+    // 표 렌더링 함수
     function renderTable(data) {
+        currentFilteredData = data;
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
         
-        data.forEach(customer => {
+        // 전체 선택 체크박스 초기화
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+
+        const fragment = document.createDocumentFragment();
+        data.forEach((customer, index) => {
             const tr = document.createElement('tr');
+            
+            // [1] 행 선택 체크박스
+            const checkTd = document.createElement('td');
+            checkTd.className = "text-center";
+            checkTd.innerHTML = `<input class="form-check-input row-checkbox" type="checkbox" value="${index}">`;
+            tr.appendChild(checkTd);
+
+            // [2] 연도(시트) 열
             const yearTd = document.createElement('td');
+            yearTd.className = "text-center";
             yearTd.innerHTML = `<span class="badge badge-year">${customer._sheetName || '-'}</span>`;
             tr.appendChild(yearTd);
 
+            // [3] 일반 데이터 열
             headers.forEach(header => {
                 const td = document.createElement('td');
                 td.textContent = customer[header] || '';
                 tr.appendChild(td);
             });
-            tbody.appendChild(tr);
+            fragment.appendChild(tr);
         });
+        tbody.appendChild(fragment);
 
         const statusBadge = document.getElementById('statusBadge');
-        statusBadge.className = 'badge bg-success p-2';
-        statusBadge.textContent = `검색 결과: 총 ${data.length}건 (모든 연도 연동 완료)`;
+        statusBadge.className = 'badge bg-success p-2 me-2';
+        statusBadge.textContent = `조회 완료: 총 ${data.length}건`;
     }
 
-    async function loadData() {
+    // 상단 전체 선택/해제 체크박스 기능
+    function toggleSelectAll(masterCheckbox) {
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = masterCheckbox.checked;
+        });
+    }
+
+    // [핵심 기능] 체크한 행(Row)만 엑셀 양식으로 복사
+    function copySelectedRowsToExcel() {
+        const selectedCheckboxes = document.querySelectorAll('.row-checkbox:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert('복사할 행을 먼저 체크해주세요!');
+            return;
+        }
+
+        // 엑셀에서 열 구분이 되도록 탭(\t)으로 연결하여 헤더 작성
+        let tsvContent = ["연도(시트)", ...headers].join("\t") + "\n";
+        
+        selectedCheckboxes.forEach(cb => {
+            const index = parseInt(cb.value, 10);
+            const customer = currentFilteredData[index];
+            if (customer) {
+                const row = [
+                    customer._sheetName || '',
+                    ...headers.map(h => (customer[h] || '').replace(/\t|\n|\r/g, " "))
+                ];
+                tsvContent += row.join("\t") + "\n";
+            }
+        });
+
+        navigator.clipboard.writeText(tsvContent).then(() => {
+            alert(`✅ 선택한 ${selectedCheckboxes.length}개 행이 복사되었습니다!\n엑셀이나 구글 시트에 Ctrl + V로 붙여넣으세요.`);
+        }).catch(err => {
+            alert('복사 중 오류가 발생했습니다.');
+        });
+    }
+
+    // 데이터 로드 함수 (초고속 로컬 캐싱 유지)
+    async function loadData(forceRefresh = false) {
         const statusBadge = document.getElementById('statusBadge');
         const searchInput = document.getElementById('searchInput');
         
-        statusBadge.className = 'badge bg-warning text-dark p-2';
-        statusBadge.textContent = '구글 시트 전체 탭 동기화 중...';
+        // 1. 캐시 데이터 즉시 표시
+        const cachedData = localStorage.getItem('junu_sheet_data');
+        if (cachedData && !forceRefresh) {
+            const parsed = JSON.parse(cachedData);
+            headers = parsed.headers;
+            customers = parsed.data;
+            renderHeaders();
+            renderTable(customers);
+            searchInput.disabled = false;
+            searchInput.placeholder = "🔍 검색어 입력 (고객명, 연락처, 상호 등 전체 즉시 필터링)...";
+            statusBadge.className = 'badge bg-info text-dark p-2 me-2';
+            statusBadge.textContent = `조회 완료: ${customers.length}건 (빠른 실행 모드)`;
+            return;
+        }
+
+        statusBadge.className = 'badge bg-warning text-dark p-2 me-2';
+        statusBadge.textContent = '구글 시트 최신 데이터 동기화 중...';
         searchInput.disabled = true;
 
         try {
-            // 인터넷 접속 및 CORS 우회를 위한 설정
             const response = await fetch(WEB_APP_URL, {
                 method: 'GET',
                 mode: 'cors',
                 redirect: 'follow'
             });
 
-            if (!response.ok) {
-                throw new Error(`서버 응답 오류 (상태코드: ${response.status})`);
-            }
-
+            if (!response.ok) throw new Error('서버 응답 오류');
             const result = await response.json();
 
-            // 스크립트 쪽에서 에러 메시지를 넘겨주면 표시
-            if (result.status === "error") {
-                throw new Error(`스크립트 오류: ${result.message}`);
-            }
+            if (result.status === "error") throw new Error(result.message);
 
             headers = result.headers;
             customers = result.data;
 
-            const thead = document.getElementById('tableHeader');
-            thead.innerHTML = '<th>연도(시트)</th>';
-            headers.forEach(header => {
-                const th = document.createElement('th');
-                th.textContent = header;
-                thead.appendChild(th);
-            });
+            // 로컬 스토리지에 새 데이터 저장
+            localStorage.setItem('junu_sheet_data', JSON.stringify({
+                headers: headers,
+                data: customers
+            }));
 
+            renderHeaders();
             renderTable(customers);
             searchInput.disabled = false;
-            searchInput.placeholder = "🔍 검색어를 입력하세요 (고객명, 연락처, 상호, 연도 등)...";
+            searchInput.placeholder = "🔍 검색어 입력 (고객명, 연락처, 상호 등 전체 즉시 필터링)...";
             searchInput.focus();
 
         } catch (error) {
             console.error('Data Load Error:', error);
-            statusBadge.className = 'badge bg-danger p-2';
-            statusBadge.textContent = '연동 실패! (콘솔창 에러 확인)';
-            
-            // 왜 안 되는지 사용자 화면에 바로 알려주는 친절한 경고창
-            alert(
-                "❌ 구글 시트 데이터를 가져오지 못했습니다.\n\n" +
-                "[원인 안내]\n" +
-                "1. Apps Script에서 권한을 '모든 사용자'로 설정하셨나요?\n" +
-                "2. 코드 수정 후 반드시 '새 버전'으로 배포하셔야 합니다.\n" +
-                "3. 로컬 파일(file://)이 아닌 깃허브 페이지(https://) 주소에서 접속하셨나요?\n\n" +
-                `상세 오류 메세지: ${error.message}`
-            );
+            statusBadge.className = 'badge bg-danger p-2 me-2';
+            statusBadge.textContent = '연동 실패';
+            alert("❌ 구글 시트 데이터를 불러오지 못했습니다.\n Apps Script 주소와 권한을 확인해주세요.");
         }
     }
 
+    // 실시간 즉시 검색 필터링
     document.getElementById('searchInput').addEventListener('keyup', function() {
         const searchTerm = this.value.toLowerCase();
         const filteredData = customers.filter(customer => {
@@ -187,7 +297,8 @@
         renderTable(filteredData);
     });
 
-    window.addEventListener('DOMContentLoaded', loadData);
+    // 페이지 접속 시 데이터 자동 로드
+    window.addEventListener('DOMContentLoaded', () => loadData(false));
 </script>
 </body>
 </html>
