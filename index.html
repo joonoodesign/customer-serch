@@ -37,7 +37,6 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.08);
             overflow-x: auto;
             max-height: 75vh;
-            /* 엑셀처럼 텍스트를 마우스 드래그로 편하게 선택할 수 있도록 설정 */
             user-select: text;
             -webkit-user-select: text;
         }
@@ -73,7 +72,6 @@
             width: 40px;
             text-align: center;
         }
-        /* 마우스 드래그 선택 시 형광펜처럼 선명하게 하이라이트 */
         ::selection {
             background-color: #b3d4fc;
             color: #000;
@@ -117,7 +115,7 @@
 
 <script>
     // =========================================================================
-    // [중요] 사용 중이신 '웹 앱 URL'을 아래에 붙여넣으세요!
+    // [자동 반영 완료] 첨부해주신 주누디자인 전용 Apps Script 웹앱 주소
     // =========================================================================
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzOVRkVvJH0c5sv7zQcH9fX1qh1-JRQHMUpf-k90cIt_h-qu3ln2HPpSNrUVlO5swVG/exec';
 
@@ -125,18 +123,15 @@
     let headers = [];
     let currentFilteredData = [];
 
-    // 헤더 렌더링 (맨 앞에 체크박스 + 연도 탭 열 추가)
     function renderHeaders() {
         const thead = document.getElementById('tableHeader');
         thead.innerHTML = '';
         
-        // 전체 선택 체크박스 열
         const checkTh = document.createElement('th');
         checkTh.className = "checkbox-col";
         checkTh.innerHTML = `<input class="form-check-input" type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)" title="전체 선택/해제">`;
         thead.appendChild(checkTh);
 
-        // 연도 열
         const yearTh = document.createElement('th');
         yearTh.textContent = "연도(시트)";
         thead.appendChild(yearTh);
@@ -148,13 +143,11 @@
         });
     }
 
-    // 표 렌더링 함수
     function renderTable(data) {
         currentFilteredData = data;
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
         
-        // 전체 선택 체크박스 초기화
         const selectAllCheckbox = document.getElementById('selectAllCheckbox');
         if (selectAllCheckbox) selectAllCheckbox.checked = false;
 
@@ -162,19 +155,16 @@
         data.forEach((customer, index) => {
             const tr = document.createElement('tr');
             
-            // [1] 행 선택 체크박스
             const checkTd = document.createElement('td');
             checkTd.className = "text-center";
             checkTd.innerHTML = `<input class="form-check-input row-checkbox" type="checkbox" value="${index}">`;
             tr.appendChild(checkTd);
 
-            // [2] 연도(시트) 열
             const yearTd = document.createElement('td');
             yearTd.className = "text-center";
             yearTd.innerHTML = `<span class="badge badge-year">${customer._sheetName || '-'}</span>`;
             tr.appendChild(yearTd);
 
-            // [3] 일반 데이터 열
             headers.forEach(header => {
                 const td = document.createElement('td');
                 td.textContent = customer[header] || '';
@@ -189,7 +179,6 @@
         statusBadge.textContent = `조회 완료: 총 ${data.length}건`;
     }
 
-    // 상단 전체 선택/해제 체크박스 기능
     function toggleSelectAll(masterCheckbox) {
         const checkboxes = document.querySelectorAll('.row-checkbox');
         checkboxes.forEach(cb => {
@@ -197,7 +186,6 @@
         });
     }
 
-    // [핵심 기능] 체크한 행(Row)만 엑셀 양식으로 복사
     function copySelectedRowsToExcel() {
         const selectedCheckboxes = document.querySelectorAll('.row-checkbox:checked');
         if (selectedCheckboxes.length === 0) {
@@ -205,7 +193,6 @@
             return;
         }
 
-        // 엑셀에서 열 구분이 되도록 탭(\t)으로 연결하여 헤더 작성
         let tsvContent = ["연도(시트)", ...headers].join("\t") + "\n";
         
         selectedCheckboxes.forEach(cb => {
@@ -227,24 +214,26 @@
         });
     }
 
-    // 데이터 로드 함수 (초고속 로컬 캐싱 유지)
     async function loadData(forceRefresh = false) {
         const statusBadge = document.getElementById('statusBadge');
         const searchInput = document.getElementById('searchInput');
         
-        // 1. 캐시 데이터 즉시 표시
         const cachedData = localStorage.getItem('junu_sheet_data');
         if (cachedData && !forceRefresh) {
-            const parsed = JSON.parse(cachedData);
-            headers = parsed.headers;
-            customers = parsed.data;
-            renderHeaders();
-            renderTable(customers);
-            searchInput.disabled = false;
-            searchInput.placeholder = "🔍 검색어 입력 (고객명, 연락처, 상호 등 전체 즉시 필터링)...";
-            statusBadge.className = 'badge bg-info text-dark p-2 me-2';
-            statusBadge.textContent = `조회 완료: ${customers.length}건 (빠른 실행 모드)`;
-            return;
+            try {
+                const parsed = JSON.parse(cachedData);
+                headers = parsed.headers;
+                customers = parsed.data;
+                renderHeaders();
+                renderTable(customers);
+                searchInput.disabled = false;
+                searchInput.placeholder = "🔍 검색어 입력 (고객명, 연락처, 상호 등 전체 즉시 필터링)...";
+                statusBadge.className = 'badge bg-info text-dark p-2 me-2';
+                statusBadge.textContent = `조회 완료: ${customers.length}건 (빠른 실행 모드)`;
+                return;
+            } catch (e) {
+                localStorage.removeItem('junu_sheet_data');
+            }
         }
 
         statusBadge.className = 'badge bg-warning text-dark p-2 me-2';
@@ -252,21 +241,36 @@
         searchInput.disabled = true;
 
         try {
+            // 무한 로딩 방지 (15초 이상 걸리면 강제 예외 처리)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
             const response = await fetch(WEB_APP_URL, {
                 method: 'GET',
                 mode: 'cors',
-                redirect: 'follow'
+                redirect: 'follow',
+                signal: controller.signal
             });
 
-            if (!response.ok) throw new Error('서버 응답 오류');
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`서버 응답 오류 (상태코드: ${response.status})`);
+            }
+
             const result = await response.json();
 
-            if (result.status === "error") throw new Error(result.message);
+            if (result.status === "error") {
+                throw new Error(`스크립트 내부 오류: ${result.message}`);
+            }
 
-            headers = result.headers;
-            customers = result.data;
+            headers = result.headers || [];
+            customers = result.data || [];
 
-            // 로컬 스토리지에 새 데이터 저장
+            if (headers.length === 0 || customers.length === 0) {
+                throw new Error("가져온 데이터가 비어 있습니다. 시트에 내용이 있는지 확인해주세요.");
+            }
+
             localStorage.setItem('junu_sheet_data', JSON.stringify({
                 headers: headers,
                 data: customers
@@ -282,11 +286,24 @@
             console.error('Data Load Error:', error);
             statusBadge.className = 'badge bg-danger p-2 me-2';
             statusBadge.textContent = '연동 실패';
-            alert("❌ 구글 시트 데이터를 불러오지 못했습니다.\n Apps Script 주소와 권한을 확인해주세요.");
+            
+            // 왜 실패했는지 사장님께 즉시 알려주는 원인 안내 창
+            let reasonText = error.message;
+            if (error.name === 'AbortError') {
+                reasonText = "응답 시간 초과 (구글 서버 접속이 지연되거나 권한에 문제가 있습니다)";
+            }
+
+            alert(
+                "❌ 구글 시트 데이터를 불러오지 못했습니다!\n\n" +
+                `[실패 원인] : ${reasonText}\n\n` +
+                "💡 해결 방법 (확인 필수):\n" +
+                "1. Apps Script 배포 시 '액세스 권한이 있는 사용자'를 [모든 사용자(Anyone)]로 하셨나요?\n" +
+                "2. 코드를 수정한 적이 있다면 배포 관리에서 반드시 [새 버전]으로 배포하셨나요?\n" +
+                "3. 내 컴퓨터(file://)로 그냥 더블클릭해 열지 마시고, 깃허브 사이트(https://) 주소로 접속해주세요!"
+            );
         }
     }
 
-    // 실시간 즉시 검색 필터링
     document.getElementById('searchInput').addEventListener('keyup', function() {
         const searchTerm = this.value.toLowerCase();
         const filteredData = customers.filter(customer => {
@@ -297,7 +314,6 @@
         renderTable(filteredData);
     });
 
-    // 페이지 접속 시 데이터 자동 로드
     window.addEventListener('DOMContentLoaded', () => loadData(false));
 </script>
 </body>
